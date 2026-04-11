@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>xbeam demo</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <script type="module">
+        async function loadBeamModule() {
+            try {
+                const mod = await import('../dist/index.js');
+                window.analyzeBeamChartReadyFn = mod.analyzeBeamChartReady;
+                if (typeof window.analyzeBeamChartReadyFn !== 'function') throw new Error('analyzeBeamChartReady export not found');
+                initCharts();
+                runAnalysis();
+            } catch (err) {
+                alert('Failed to load beam module: ' + err.message + '\n\nCheck browser console for details.');
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', loadBeamModule);
+    </script>
+    <style>
+        :root {
+            --bg: #f4f6f8;
+            --card: #ffffff;
+            --text: #1f2937;
+            --accent: #0b74de;
+            --accent-hover: #095fba;
+            --border: #d6dbe2;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .page {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        h1, h2, h3 { margin: 8px 0; }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1.1fr 1.9fr;
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 4px 12px rgba(15, 24, 39, 0.08);
+        }
+
+        .form-group { margin-bottom: 12px; }
+        label { display: block; margin-bottom: 4px; font-size: 0.95rem; }
+        input, select { width: 100%; padding: 8px 10px; border: 1px solid #cfd8e3; border-radius: 8px; }
+
+        button {
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: var(--accent);
+            color: white;
+            padding: 10px 16px;
+            font-weight: 600;
+            transition: background 0.2s ease;
+        }
+
+        button:hover { background: var(--accent-hover); }
+
+        .results, .reactions { margin-top: 16px; }
+        .reactions { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+        .reaction { border: 1px solid var(--border); background: #fff; border-radius: 8px; padding: 10px; }
+
+        canvas { width: 100%; height: 300px !important; border: 1px solid var(--border); border-radius: 8px; }
+
+        @media (max-width: 960px) {
+            .container { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <h1>xbeam demo <span id="version">v0.1.0</span></h1>
+    <div class="container">
+        <div class="left">
+            <h2>Beam Setup</h2>
+            <div class="form-group">
+                <label>Length (m):</label>
+                <input type="number" id="length" value="5">
+            </div>
+            <div class="form-group">
+                <label>E (GPa):</label>
+                <input type="number" id="e" value="200">
+            </div>
+            <div class="form-group">
+                <label>I (cm⁴):</label>
+                <input type="number" id="i" value="100">
+            </div>
+            <h3>Supports</h3>
+            <div id="supports">
+                <div class="support">
+                    <input type="checkbox" checked> PINNED at <input type="number" value="0"> m
+                </div>
+                <div class="support">
+                    <input type="checkbox" checked> ROLLER at <input type="number" value="5"> m
+                </div>
+            </div>
+            <button onclick="addSupport()">+ Add Support</button>
+            <h3>Point Loads</h3>
+            <div id="pointLoads">
+                <div class="load">
+                    <input type="number" value="-10000"> N at <input type="number" value="2.5"> m
+                </div>
+            </div>
+            <button onclick="addPointLoad()">+ Add Load</button>
+            <h3>UDL</h3>
+            <div id="udl">
+                <div class="load">
+                    <input type="number" value="-10000"> N/m from <input type="number" value="0"> to <input type="number" value="5"> m
+                </div>
+            </div>
+            <button onclick="addUDL()">+ Add UDL</button>
+            <br><br>
+            <select id="examples">
+                <option value="">Load example...</option>
+                <option value="ss-udl">Simply supported — UDL</option>
+                <option value="cantilever-tip">Cantilever — tip point load</option>
+                <option value="propped-udl">Propped cantilever — UDL</option>
+                <option value="fixed-fixed-udl">Fixed-fixed — UDL</option>
+                <option value="overhanging">Overhanging beam — tip load</option>
+            </select>
+            <br><br>
+            <button onclick="runAnalysis()">Analyze ▶</button>
+        </div>
+        <div class="right">
+            <h2>Results</h2>
+            <div id="solveTime"></div>
+            <div class="results">
+                <h3>Reactions</h3>
+                <div id="reactions" class="reactions"></div>
+                <p>Max deflection: <span id="maxDeflection"></span> mm</p>
+                <p>Max moment: <span id="maxMoment"></span> kN·m</p>
+                <p>Max shear: <span id="maxShear"></span> kN</p>
+            </div>
+            <h3>Deflection</h3>
+            <canvas id="deflectionChart"></canvas>
+            <h3>Bending Moment</h3>
+            <canvas id="momentChart"></canvas>
+            <h3>Shear Force</h3>
+            <canvas id="shearChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let deflectionChart, momentChart, shearChart;
+
+        function initCharts() {
+            const ctxDef = document.getElementById('deflectionChart').getContext('2d');
+            deflectionChart = new Chart(ctxDef, {
+                type: 'line',
+                data: { datasets: [{ label: 'w (mm)', data: [], borderColor: 'blue', borderWidth: 2, fill: false }] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        x: { type: 'linear', title: { display: true, text: 'x (m)' } },
+                        y: { title: { display: true, text: 'Deflection (mm)' } }
+                    }
+                }
+            });
+
+            const ctxMom = document.getElementById('momentChart').getContext('2d');
+            momentChart = new Chart(ctxMom, {
+                type: 'line',
+                data: { datasets: [{ label: 'M (kN·m)', data: [], borderColor: 'red', borderWidth: 2, fill: false }] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        x: { type: 'linear', title: { display: true, text: 'x (m)' } },
+                        y: { title: { display: true, text: 'Moment (kN·m)' } }
+                    }
+                }
+            });
+
+            const ctxShear = document.getElementById('shearChart').getContext('2d');
+            shearChart = new Chart(ctxShear, {
+                type: 'line',
+                data: { datasets: [{ label: 'V (kN)', data: [], borderColor: 'green', borderWidth: 2, fill: false }] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        x: { type: 'linear', title: { display: true, text: 'x (m)' } },
+                        y: { title: { display: true, text: 'Shear (kN)' } }
+                    }
+                }
+            });
+        }
+
+        function runAnalysis() {
+            try {
+                if (typeof window.analyzeBeamChartReadyFn !== 'function') throw new Error('Beam analysis function not loaded yet');
+                const start = performance.now();
+                const beam = getBeamInput();
+                const { results, diagrams } = window.analyzeBeamChartReadyFn(beam);
+                const end = performance.now();
+                document.getElementById('solveTime').textContent = `Solve time: ${(end - start).toFixed(2)} ms`;
+
+                updateResults(results);
+                updateCharts(diagrams);
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        function getBeamInput() {
+            const length = parseFloat(document.getElementById('length').value);
+            const e = parseFloat(document.getElementById('e').value) * 1e9;
+            const i = parseFloat(document.getElementById('i').value) * 1e-8; // cm^4 to m^4
+
+            const supports = [];
+            document.querySelectorAll('#supports .support').forEach(div => {
+                const checked = div.querySelector('input[type="checkbox"]').checked;
+                if (checked) {
+                    const kind = div.textContent.includes('PINNED') ? 'PINNED' : div.textContent.includes('FIXED') ? 'FIXED' : 'ROLLER';
+                    const pos = parseFloat(div.querySelector('input[type="number"]').value);
+                    supports.push({ kind, position: pos });
+                }
+            });
+
+            const pointLoads = [];
+            document.querySelectorAll('#pointLoads .load').forEach(div => {
+                const inputs = div.querySelectorAll('input');
+                const mag = parseFloat(inputs[0].value);
+                const pos = parseFloat(inputs[1].value);
+                pointLoads.push({ magnitude: mag, position: pos });
+            });
+
+            const distributedLoads = [];
+            document.querySelectorAll('#udl .load').forEach(div => {
+                const inputs = div.querySelectorAll('input');
+                const mag = parseFloat(inputs[0].value);
+                const start = parseFloat(inputs[1].value);
+                const end = parseFloat(inputs[2].value);
+                distributedLoads.push({ startMagnitude: mag, endMagnitude: mag, startPosition: start, endPosition: end });
+            });
+
+            return { length, modulusOfElasticity: e, momentOfInertia: i, supports, pointLoads, distributedLoads, appliedMoments: [] };
+        }
+
+        function updateResults(results) {
+            const reactionsDiv = document.getElementById('reactions');
+            reactionsDiv.innerHTML = '';
+            results.nodePositions.forEach((x, i) => {
+                if (results.reactions.vertical[i] !== 0 || results.reactions.moment[i] !== 0) {
+                    const div = document.createElement('div');
+                    div.className = 'reaction';
+                    div.innerHTML = `
+                        <strong>x = ${x.toFixed(2)} m</strong><br>
+                        V = ${results.reactions.vertical[i].toFixed(1)} N<br>
+                        M = ${results.reactions.moment[i].toFixed(1)} N·m
+                    `;
+                    reactionsDiv.appendChild(div);
+                }
+            });
+
+            const maxDef = Math.min(...results.deflections) * 1000;
+            document.getElementById('maxDeflection').textContent = maxDef.toFixed(3);
+
+            const maxMom = Math.max(...results.moments.map(Math.abs)) / 1000;
+            document.getElementById('maxMoment').textContent = maxMom.toFixed(3);
+
+            const maxShear = Math.max(...results.shears.map(Math.abs)) / 1000;
+            document.getElementById('maxShear').textContent = maxShear.toFixed(3);
+        }
+
+        function updateCharts(diagrams) {
+            // Convert TypedArrays to regular arrays with {x,y} objects
+            const defData = Array.from(diagrams.deflection.x).map((x, i) => ({ x, y: diagrams.deflection.y[i] * 1000 }));
+            deflectionChart.data.datasets[0].data = defData;
+            deflectionChart.update();
+
+            const momData = Array.from(diagrams.moment.x).map((x, i) => ({ x, y: diagrams.moment.y[i] / 1000 }));
+            momentChart.data.datasets[0].data = momData;
+            momentChart.update();
+
+            const shearData = Array.from(diagrams.shear.x).map((x, i) => ({ x, y: diagrams.shear.y[i] / 1000 }));
+            shearChart.data.datasets[0].data = shearData;
+            shearChart.update();
+        }
+
+        function addSupport() {
+            const div = document.createElement('div');
+            div.className = 'support';
+            div.innerHTML = '<input type="checkbox"> <select><option>PINNED</option><option>ROLLER</option><option>FIXED</option></select> at <input type="number"> m';
+            document.getElementById('supports').appendChild(div);
+        }
+
+        function addPointLoad() {
+            const div = document.createElement('div');
+            div.className = 'load';
+            div.innerHTML = '<input type="number"> N at <input type="number"> m';
+            document.getElementById('pointLoads').appendChild(div);
+        }
+
+        function addUDL() {
+            const div = document.createElement('div');
+            div.className = 'load';
+            div.innerHTML = '<input type="number"> N/m from <input type="number"> to <input type="number"> m';
+            document.getElementById('udl').appendChild(div);
+        }
+
+        document.getElementById('examples').addEventListener('change', function() {
+            const val = this.value;
+            if (val === 'ss-udl') {
+                document.getElementById('length').value = 5;
+                document.getElementById('e').value = 200;
+                document.getElementById('i').value = 100;
+                // supports already set
+                // loads already set
+            } else if (val === 'cantilever-tip') {
+                document.getElementById('length').value = 3;
+                document.getElementById('supports').innerHTML = '<div class="support"><input type="checkbox" checked> FIXED at <input type="number" value="0"> m</div>';
+                document.getElementById('pointLoads').innerHTML = '<div class="load"><input type="number" value="-2000"> N at <input type="number" value="3"> m</div>';
+                document.getElementById('udl').innerHTML = '';
+            } // add others similarly
+        });
+    </script>
+</body>
+</html>

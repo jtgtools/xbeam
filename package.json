@@ -1,0 +1,31 @@
+{
+  "name": "xbeam",
+  "version": "0.0.1",
+  "description": "Fast Euler-Bernoulli beam FEM solver with chart-ready results",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "prepare": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "demo": "npm run build && npx serve . --listen 3000",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "bench": "vitest bench"
+  },
+  "dependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.2"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.2"
+  }
+}
