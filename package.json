@@ -1,7 +1,24 @@
 {
   "name": "@jtgtools/xbeam",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Fast Euler-Bernoulli beam FEM solver with chart-ready results",
+  "license": "MIT",
+  "author": "JTG Tools",
+  "keywords": [
+    "beam",
+    "fem",
+    "finite-element",
+    "structural-engineering",
+    "euler-bernoulli"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jtgtools/xbeam.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jtgtools/xbeam/issues"
+  },
+  "homepage": "https://github.com/jtgtools/xbeam#readme",
   "type": "module",
   "main": "dist/index.cjs",
   "module": "dist/index.js",
@@ -21,11 +38,9 @@
     "test:watch": "vitest",
     "bench": "vitest bench"
   },
-  "dependencies": {
-    "tsup": "^8.5.1",
-    "typescript": "^6.0.2"
-  },
   "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.2",
     "vitest": "^4.1.2"
   }
 }

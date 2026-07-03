@@ -16,9 +16,10 @@ A fast Euler-Bernoulli beam finite element solver in TypeScript with chart-ready
 ## Install
 
 ```bash
-npm install
-npm run build
+npm install @jtgtools/xbeam
 ```
+
+For local development, clone the repo, then run `npm install` and `npm run build`.
 
 ## Scripts
 
