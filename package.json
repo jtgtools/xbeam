@@ -1,5 +1,5 @@
 {
-  "name": "xbeam",
+  "name": "@jtgtools/xbeam",
   "version": "0.0.1",
   "description": "Fast Euler-Bernoulli beam FEM solver with chart-ready results",
   "type": "module",

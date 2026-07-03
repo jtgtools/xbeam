@@ -29,7 +29,7 @@ npm run build
 ## Usage
 
 ```ts
-import { analyzeBeam, analyzeBeamChartReady } from 'xbeam';
+import { analyzeBeam, analyzeBeamChartReady } from '@jtgtools/xbeam';
 
 const beam = {
   length: 5,
